@@ -1,4 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#151412">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bellwork">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Bellwork - Kettlebell AMRAP Clock</title>
 
 <!-- ================================================================
@@ -24,6 +33,9 @@
 ================================================================ -->
 
 <style>
+/* NOTE: this file is a full standalone document (GitHub Pages is the
+   canonical host). Do not publish it via the Artifact tool as-is - the
+   artifact wrapper would double-wrap the head/body skeleton. */
 /* ============================ TOKENS ============================ */
 :root{
   /* ground - cast iron, slightly warm, never pure black */
@@ -67,6 +79,7 @@
 html,body{background:var(--iron-0);margin:0}
 #app{
   min-height:100dvh;
+  padding-top:env(safe-area-inset-top); /* standalone (home-screen) mode: keep content out of the status bar */
   background:var(--iron-0);
   color:var(--chalk);
   font-family:var(--font-ui);
@@ -350,6 +363,8 @@ input{font:inherit;color:inherit}
 .newlink{display:block;text-align:center;margin:18px auto 0;padding:12px;color:var(--chalk-2);
   font-family:var(--font-display);font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:13px}
 </style>
+</head>
+<body>
 
 <main id="app" data-screen="home" data-bell="35" data-mode="work">
 
@@ -987,3 +1002,5 @@ $('newWorkout').addEventListener('click', e => {
 if (S.bellKind === 'other') $('otherLb').value = S.bell;
 renderHome();
 </script>
+</body>
+</html>
