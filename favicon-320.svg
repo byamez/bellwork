@@ -1,0 +1,32 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_1_30)">
+<rect width="320" height="320" rx="8" fill="#D4F5DC"/>
+<g filter="url(#filter0_n_1_30)">
+<path d="M237.235 43.4778L237.985 43.7372C269.335 54.8656 277.569 95.463 253.034 117.927L252.444 118.458L233.287 135.411C252.752 161.867 259.455 197.072 248.198 230.571C229.841 285.201 170.673 314.605 116.043 296.248C61.4132 277.89 32.0086 218.722 50.3661 164.092C61.6229 130.593 88.2254 106.581 119.716 97.2486L114.684 72.1663C108.051 39.1016 139.372 11.1986 171.332 21.3392L172.087 21.5859L237.235 43.4778ZM161.635 52.6911C153.341 49.904 145.136 57.1329 146.857 65.712L152.331 92.9979C162.361 93.2946 172.517 95.0536 182.521 98.4153C192.525 101.777 201.683 106.508 209.856 112.328L230.697 93.8853C237.25 88.0865 235.077 77.3705 226.783 74.583L161.635 52.6911Z" fill="#042722"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_n_1_30" x="44.9023" y="19.2265" width="222.463" height="282.485" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feTurbulence type="fractalNoise" baseFrequency="2 2" stitchTiles="stitch" numOctaves="3" result="noise" seed="7231" />
+<feComponentTransfer in="noise" result="coloredNoise1">
+<feFuncR type="linear" slope="2" intercept="-0.5" />
+<feFuncG type="linear" slope="2" intercept="-0.5" />
+<feFuncB type="linear" slope="2" intercept="-0.5" />
+<feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "/>
+</feComponentTransfer>
+<feComposite operator="in" in2="shape" in="coloredNoise1" result="noise1Clipped" />
+<feComponentTransfer in="noise1Clipped" result="color1">
+<feFuncA type="table" tableValues="0 0.34" />
+</feComponentTransfer>
+<feMerge result="effect1_noise_1_30">
+<feMergeNode in="shape" />
+<feMergeNode in="color1" />
+</feMerge>
+</filter>
+<clipPath id="clip0_1_30">
+<rect width="320" height="320" rx="8" fill="white"/>
+</clipPath>
+</defs>
+</svg>
