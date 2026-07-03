@@ -1,0 +1,989 @@
+<meta charset="utf-8">
+<title>Bellwork - Kettlebell AMRAP Clock</title>
+
+<!-- ================================================================
+  BELLWORK v1.2 - kettlebell AMRAP circuit clock
+  Master copy lives in the fitness folder; published as a claude.ai
+  hosted artifact. Single self-contained file, no external resources.
+
+  NOTE: this file is deliberately pure ASCII. The artifact host does
+  not reliably declare UTF-8, so any raw unicode renders as mojibake.
+  Use HTML entities (&middot; &minus; &larr; &mdash;) in markup and
+  \u escapes (\u00B7 \u00D7 \u2713 \u2014) in JS strings.
+
+  FOR FUTURE RESTYLING (James):
+    1. TOKENS   - every color / font / radius / spacing decision is a
+                  custom property in the :root block below. Restyle = CSS only.
+    2. LAYOUT   - one screen at a time; <section data-s="..."> toggled
+                  via the hidden attribute. JS only toggles classes/attrs.
+                  Screens: home -> ready -> active -> summary (+ setup).
+    3. DATA     - movement library + presets at top of the script.
+    4. ENGINE   - timestamp-based timer state machine (survives tab throttling).
+  Deliberate choice: single dark theme (a gym tool, not a document).
+  Roadmap (not built): double-kettlebell mode.
+================================================================ -->
+
+<style>
+/* ============================ TOKENS ============================ */
+:root{
+  /* ground - cast iron, slightly warm, never pure black */
+  --iron-0:#151412;
+  --iron-1:#1D1B18;
+  --iron-2:#272420;
+  --line:rgba(242,239,232,.13);
+
+  /* ink - chalk */
+  --chalk:#F2EFE8;
+  --chalk-2:#A8A296;
+  --chalk-3:#6F6A60;
+
+  /* bell accents - competition color coding: 16 kg (~35 lb) yellow, 20 kg (~44 lb) purple */
+  --bell-35:#E9C227;
+  --bell-44:#B591E8;
+  --bell-other:#9FB2C4;
+  --accent:var(--bell-35);
+  --accent-ink:#151412;
+
+  /* semantic (separate from accent) */
+  --rest:#7FA8C9;
+  --hot:#E86740;
+  --good:#8FBF6F;
+
+  /* type */
+  --font-display:'Avenir Next Condensed','Arial Narrow','Helvetica Neue',-apple-system,sans-serif;
+  --font-ui:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;
+  --font-clock:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+
+  /* shape + space */
+  --r:6px;
+  --pad:20px;
+  --maxw:430px;
+  --slab-h:92px;
+}
+#app[data-bell="44"]{--accent:var(--bell-44)}
+#app[data-bell="other"]{--accent:var(--bell-other)}
+
+/* ============================ BASE ============================ */
+html,body{background:var(--iron-0);margin:0}
+#app{
+  min-height:100dvh;
+  background:var(--iron-0);
+  color:var(--chalk);
+  font-family:var(--font-ui);
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+#app *{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font:inherit;color:inherit}
+
+.col{max-width:var(--maxw);margin:0 auto;padding:0 var(--pad)}
+
+/* display type */
+.disp{
+  font-family:var(--font-display);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.eyebrow{
+  font-family:var(--font-display);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  font-size:13px;
+  color:var(--chalk-2);
+}
+.clock-face{font-family:var(--font-clock);font-variant-numeric:tabular-nums}
+
+/* ============================ SHARED UI ============================ */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px var(--pad) 10px;
+  max-width:var(--maxw);margin:0 auto;
+}
+.wordmark{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase}
+.wordmark b{color:var(--accent);font-weight:700}
+
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--font-display);font-weight:600;font-size:13px;
+  letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:5px 10px;color:var(--chalk-2);
+}
+.badge .dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+
+/* chip row (bell weight) */
+.chips{display:flex;gap:8px}
+.chip{
+  flex:1;
+  font-family:var(--font-display);font-weight:600;font-size:17px;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:14px 0;text-align:center;
+  border:1px solid var(--line);border-radius:var(--r);
+  color:var(--chalk-2);background:var(--iron-1);
+}
+.chip[aria-pressed="true"]{
+  border-color:var(--accent);color:var(--accent-ink);background:var(--accent);
+}
+.otherweight{display:flex;align-items:center;gap:10px;margin-top:10px}
+.otherweight input{
+  width:90px;background:var(--iron-1);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 12px;font-size:18px;text-align:center;
+  font-family:var(--font-clock);
+}
+.otherweight label{font-size:13px;color:var(--chalk-2)}
+
+/* big action slabs */
+.slab{
+  display:flex;flex-direction:column;justify-content:center;gap:3px;
+  width:100%;min-height:76px;padding:14px 18px;text-align:left;
+  background:var(--iron-1);border:1px solid var(--line);border-radius:var(--r);
+}
+.slab .t{font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:.06em;text-transform:uppercase}
+.slab .d{font-size:13px;color:var(--chalk-2);line-height:1.35}
+.slab:active{background:var(--iron-2)}
+.slab--accent{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.slab--accent .d{color:var(--accent-ink);opacity:.72}
+.slab--accent:active{filter:brightness(.92);background:var(--accent)}
+
+/* fixed primary action (thumb zone) */
+.action{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:max(14px, env(safe-area-inset-bottom));
+  width:min(100vw - 28px, calc(var(--maxw) - 28px));
+  height:var(--slab-h);
+  border-radius:var(--r);
+  font-family:var(--font-display);font-weight:700;font-size:30px;
+  letter-spacing:.1em;text-transform:uppercase;
+  background:var(--accent);color:var(--accent-ink);
+  box-shadow:0 8px 28px rgba(0,0,0,.45);
+}
+.action:active{filter:brightness(.92)}
+.action:disabled{background:var(--iron-2);color:var(--chalk-3);box-shadow:none}
+.action--rest{background:var(--rest)}
+.action--hot{background:var(--hot);color:var(--iron-0)}
+.has-action{padding-bottom:calc(var(--slab-h) + 40px)}
+
+/* small utility button */
+.mini{
+  font-family:var(--font-display);font-weight:600;font-size:13px;
+  letter-spacing:.12em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:7px 12px;color:var(--chalk-2);
+}
+.mini:active{background:var(--iron-2)}
+.mini--danger{color:var(--hot);border-color:rgba(232,103,64,.4)}
+
+/* stepper */
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{
+  width:52px;height:52px;border:1px solid var(--line);border-radius:var(--r);
+  font-size:26px;color:var(--chalk);background:var(--iron-1);
+  font-family:var(--font-clock);
+}
+.stepper button:active{background:var(--iron-2)}
+.stepper .val{
+  font-family:var(--font-clock);font-variant-numeric:tabular-nums;
+  font-size:34px;min-width:110px;text-align:center;
+}
+.stepper .unit{font-size:13px;color:var(--chalk-2);display:block;margin-top:2px;font-family:var(--font-ui)}
+
+/* section label */
+.slabel{
+  font-family:var(--font-display);font-weight:600;font-size:13px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--chalk-3);
+  border-bottom:1px solid var(--line);padding-bottom:6px;margin:26px 0 10px;
+}
+
+/* ============================ HOME ============================ */
+[data-s="home"] .hero{padding-top:34px;padding-bottom:8px}
+[data-s="home"] .hero h1{
+  font-family:var(--font-display);font-weight:700;font-size:52px;line-height:.95;
+  letter-spacing:.05em;text-transform:uppercase;margin:0;text-wrap:balance;
+}
+[data-s="home"] .hero h1 b{color:var(--accent)}
+[data-s="home"] .hero p{margin:10px 0 0;color:var(--chalk-2);font-size:14px}
+.homestack{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.homefoot{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:30px;padding:14px 0 30px;border-top:1px solid var(--line);
+}
+.homefoot .ctl{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--chalk-2)}
+.homefoot .ctl .clock-face{color:var(--chalk);font-size:15px}
+.homefoot button.tiny{
+  width:34px;height:34px;border:1px solid var(--line);border-radius:var(--r);
+  font-family:var(--font-clock);font-size:16px;color:var(--chalk);
+}
+.version{color:var(--chalk-3);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding-bottom:34px}
+
+/* ============================ SETUP ============================ */
+.setuphead{display:flex;align-items:center;justify-content:space-between;padding-top:6px}
+.presetfill{display:flex;gap:8px;margin-top:10px}
+.presetfill .mini{flex:1;text-align:center}
+.count{font-family:var(--font-clock);font-variant-numeric:tabular-nums;color:var(--chalk-2);font-size:13px}
+.count.max{color:var(--hot)}
+
+.movelist{display:flex;flex-direction:column;gap:6px}
+.move{
+  display:flex;align-items:center;gap:12px;
+  border:1px solid var(--line);border-radius:var(--r);
+  background:var(--iron-1);padding:12px 14px;min-height:56px;
+  width:100%;text-align:left;
+}
+.move .box{
+  width:20px;height:20px;flex:none;border:1.5px solid var(--chalk-3);border-radius:4px;
+  display:grid;place-items:center;font-size:13px;color:var(--accent-ink);
+}
+.move[aria-pressed="true"]{border-color:var(--accent)}
+.move[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent)}
+.move .nm{flex:1;font-size:16px}
+.move .rep{font-family:var(--font-clock);font-variant-numeric:tabular-nums;font-size:14px;color:var(--chalk-2)}
+.move:disabled{opacity:.35}
+.repedit{
+  display:flex;align-items:center;gap:10px;justify-content:flex-end;
+  padding:0 2px 4px;margin-top:-2px;
+}
+.repedit label{font-size:12px;color:var(--chalk-3)}
+.repedit input{
+  width:110px;background:var(--iron-1);border:1px solid var(--line);border-radius:var(--r);
+  padding:8px 10px;font-size:15px;text-align:center;font-family:var(--font-clock);
+}
+
+/* ============================ READY ============================ */
+.readyhead{padding-top:30px}
+.readytitle{
+  font-family:var(--font-display);font-weight:700;font-size:44px;line-height:1;
+  letter-spacing:.05em;text-transform:uppercase;margin:8px 0 10px;text-wrap:balance;
+}
+.readysub{font-size:16px;color:var(--chalk-2)}
+.readynote{font-size:13px;color:var(--chalk-3);line-height:1.5;margin:12px 2px 0}
+
+/* drag-to-reorder (pointer-based: HTML5 drag-and-drop is a no-go on iOS touch) */
+.grip{
+  flex:none;width:34px;height:38px;margin:-8px 0 -8px -8px;
+  cursor:grab;touch-action:none;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  background:repeating-linear-gradient(to bottom,var(--chalk-3) 0 2px,transparent 2px 6px) center/18px 14px no-repeat;
+}
+#readyCircuit .nm{flex:1;min-width:0}
+#readyCircuit .row{background:var(--iron-1);transition:transform .15s ease}
+#readyCircuit .row.dragging{
+  position:relative;z-index:2;transition:none;
+  background:var(--iron-2);box-shadow:0 8px 20px rgba(0,0,0,.5);
+}
+@media (prefers-reduced-motion: reduce){#readyCircuit .row{transition:none}}
+
+/* ============================ ACTIVE ============================ */
+[data-s="active"] .statusrow{
+  display:flex;align-items:center;justify-content:space-between;padding-top:8px;
+}
+.clockzone{text-align:center;padding:26px 0 10px}
+.bigclock{
+  font-family:var(--font-clock);font-variant-numeric:tabular-nums;
+  font-size:clamp(72px, 24vw, 108px);line-height:1;font-weight:500;
+  letter-spacing:-.02em;margin-top:6px;
+}
+.subclock{
+  font-family:var(--font-clock);font-variant-numeric:tabular-nums;
+  font-size:16px;color:var(--chalk-3);margin-top:8px;
+}
+#app[data-mode="rest"] .bigclock{color:var(--rest)}
+#app[data-mode="rest"].rest-over .bigclock{color:var(--hot)}
+#app.overtime .bigclock{color:var(--hot)}
+
+.banner{
+  margin:10px auto 0;max-width:var(--maxw);
+  font-family:var(--font-display);font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  font-size:14px;text-align:center;color:var(--hot);
+  border:1px solid rgba(232,103,64,.45);border-radius:var(--r);
+  padding:9px 12px;
+}
+@media (prefers-reduced-motion: no-preference){
+  .banner,#app.rest-over .bigclock{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.55}}
+}
+
+.circuit{
+  border:1px solid var(--line);border-radius:var(--r);background:var(--iron-1);
+  margin-top:18px;overflow:hidden;
+}
+.circuit .row{
+  display:flex;justify-content:space-between;gap:12px;
+  padding:11px 14px;border-bottom:1px solid var(--line);font-size:15px;
+}
+.circuit .row:last-child{border-bottom:none}
+.circuit .row .rep{font-family:var(--font-clock);font-variant-numeric:tabular-nums;color:var(--chalk-2);font-size:14px}
+
+/* ============================ SUMMARY ============================ */
+[data-s="summary"] .col{padding-top:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+.stat{border:1px solid var(--line);border-radius:var(--r);background:var(--iron-1);padding:14px 12px;text-align:center}
+.stat .k{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--chalk-3);font-family:var(--font-display);font-weight:600}
+.stat .v{font-family:var(--font-clock);font-variant-numeric:tabular-nums;font-size:30px;margin-top:4px}
+.stat .v small{font-size:15px;color:var(--chalk-2)}
+.stat--hero{border-color:var(--accent)}
+.stat--hero .v{color:var(--accent);font-size:38px}
+
+.splits{border:1px solid var(--line);border-radius:var(--r);background:var(--iron-1);margin-top:8px;overflow:hidden}
+.splits .row{
+  display:flex;align-items:baseline;gap:12px;padding:9px 14px;
+  border-bottom:1px solid var(--line);
+  font-family:var(--font-clock);font-variant-numeric:tabular-nums;font-size:14px;
+}
+.splits .row:last-child{border-bottom:none}
+.splits .rn{color:var(--chalk-3);width:34px}
+.splits .wt{flex:1}
+.splits .rt{color:var(--rest)}
+
+.pastecard{margin-top:8px}
+.pastecard pre{
+  margin:0;border:1px dashed var(--line);border-radius:var(--r);
+  background:var(--iron-1);padding:14px;
+  font-family:var(--font-clock);font-size:12.5px;line-height:1.6;
+  white-space:pre-wrap;word-break:break-word;color:var(--chalk-2);
+  overflow-x:auto;
+}
+.copied .action--copy{background:var(--good)}
+.newlink{display:block;text-align:center;margin:18px auto 0;padding:12px;color:var(--chalk-2);
+  font-family:var(--font-display);font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:13px}
+</style>
+
+<main id="app" data-screen="home" data-bell="35" data-mode="work">
+
+  <!-- ============================ HOME ============================ -->
+  <section data-s="home">
+    <div class="col">
+      <header class="hero">
+        <h1>Bell<b>work</b></h1>
+        <p>AMRAP circuit clock &middot; one bell &middot; one big button</p>
+      </header>
+
+      <div class="slabel">Bell</div>
+      <div class="chips" id="bellChips">
+        <button class="chip" data-bell-pick="35" aria-pressed="true">35 lb</button>
+        <button class="chip" data-bell-pick="44" aria-pressed="false">44 lb</button>
+        <button class="chip" data-bell-pick="other" aria-pressed="false">Other</button>
+      </div>
+      <div class="otherweight" id="otherWeight" hidden>
+        <input id="otherLb" type="number" inputmode="numeric" min="5" max="200" step="1" value="53">
+        <label for="otherLb">lb</label>
+      </div>
+
+      <div class="slabel">Start</div>
+      <div class="homestack">
+        <button class="slab slab--accent" id="qUpper">
+          <span class="t">Upper &middot; 30:00</span>
+          <span class="d" id="qUpperDesc"></span>
+        </button>
+        <button class="slab slab--accent" id="qLower">
+          <span class="t">Lower &middot; 30:00</span>
+          <span class="d" id="qLowerDesc"></span>
+        </button>
+        <button class="slab" id="qCustom">
+          <span class="t">Custom workout</span>
+          <span class="d">Pick time, movements and reps</span>
+        </button>
+      </div>
+
+      <div class="homefoot">
+        <div class="ctl">
+          <span>Rest alert</span>
+          <button class="tiny" id="restMinus" aria-label="Lower rest alert">&minus;</button>
+          <span class="clock-face" id="restVal">1:30</span>
+          <button class="tiny" id="restPlus" aria-label="Raise rest alert">+</button>
+        </div>
+        <button class="mini" id="muteBtn" aria-pressed="false">Sound on</button>
+      </div>
+      <div class="version">Bellwork v1.2 &middot; double-bell mode on the roadmap</div>
+    </div>
+  </section>
+
+  <!-- ============================ CUSTOM SETUP ============================ -->
+  <section data-s="setup" hidden>
+    <div class="col has-action">
+      <div class="setuphead">
+        <button class="mini" id="setupBack">&larr; Back</button>
+        <span class="badge"><span class="dot"></span><span id="setupBell">35 lb</span></span>
+      </div>
+
+      <div class="slabel">Time</div>
+      <div class="stepper">
+        <button id="durMinus" aria-label="Less time">&minus;</button>
+        <div>
+          <div class="val clock-face" id="durVal">30:00</div>
+          <span class="unit" style="text-align:center">workout length</span>
+        </div>
+        <button id="durPlus" aria-label="More time">+</button>
+      </div>
+
+      <div class="slabel" style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line)">
+        <span>Movements</span><span class="count" id="selCount">0 / 6</span>
+      </div>
+      <div class="presetfill">
+        <button class="mini" id="fillUpper">Fill: Upper (Tue)</button>
+        <button class="mini" id="fillLower">Fill: Lower (Thu)</button>
+        <button class="mini" id="clearSel">Clear</button>
+      </div>
+      <div style="height:12px"></div>
+      <div class="movelist" id="moveList"></div>
+
+      <button class="action" id="startCustom" disabled>Review</button>
+    </div>
+  </section>
+
+  <!-- ============================ READY (confirm before the clock starts) -->
+  <section data-s="ready" hidden>
+    <div class="col has-action">
+      <div class="setuphead">
+        <button class="mini" id="readyBack">&larr; Back</button>
+        <span class="badge"><span class="dot"></span><span id="readyBell">35 lb</span></span>
+      </div>
+
+      <div class="readyhead">
+        <div class="eyebrow">Get ready</div>
+        <h2 class="readytitle" id="readyTitle">Upper (Tue)</h2>
+        <div class="readysub clock-face" id="readySub"></div>
+      </div>
+
+      <div class="circuit" id="readyCircuit"></div>
+      <p class="readynote">Nothing runs yet. Drag the grip on a movement to reorder the circuit. The clock starts when you hit Start &mdash; then it's one tap per round.</p>
+
+      <button class="action" id="readyStart">Start</button>
+    </div>
+  </section>
+
+  <!-- ============================ ACTIVE WORKOUT ============================ -->
+  <section data-s="active" hidden>
+    <div class="col has-action">
+      <div class="statusrow">
+        <span class="eyebrow" id="roundLabel">Round 1</span>
+        <span class="badge"><span class="dot"></span><span id="activeBell">35 lb</span></span>
+        <button class="mini mini--danger" id="endBtn">End</button>
+      </div>
+
+      <div class="clockzone">
+        <div class="eyebrow" id="modeLabel">Work</div>
+        <div class="bigclock" id="bigClock">30:00</div>
+        <div class="subclock" id="subClock" hidden></div>
+      </div>
+
+      <div class="banner" id="timeBanner" hidden>Time &mdash; finish your round</div>
+
+      <div class="circuit" id="circuitList"></div>
+
+      <button class="action" id="roundBtn">Done round</button>
+    </div>
+  </section>
+
+  <!-- ============================ SUMMARY ============================ -->
+  <section data-s="summary" hidden>
+    <div class="col has-action">
+      <div class="eyebrow">Session complete</div>
+
+      <div class="stats">
+        <div class="stat stat--hero"><div class="k">Rounds</div><div class="v" id="sumRounds">8</div></div>
+        <div class="stat"><div class="k">Time</div><div class="v" id="sumTime" style="font-size:24px">31:40</div></div>
+        <div class="stat"><div class="k">Bell</div><div class="v" id="sumBell">35<small> lb</small></div></div>
+      </div>
+
+      <div class="slabel">Round splits</div>
+      <div class="splits" id="splitList"></div>
+
+      <div class="slabel">Paste with your watch screenshot</div>
+      <div class="pastecard"><pre id="pasteBlock"></pre></div>
+
+      <a class="newlink" href="#" id="newWorkout">&larr; New workout</a>
+
+      <button class="action action--copy" id="copyBtn">Copy summary</button>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ============================ DATA ============================ */
+// Movement library. `short` is the compact name used in the paste summary.
+// Reps are text on purpose ("8/side", "40 m") - edited freely during setup.
+const MOVES = [
+  {id:'swing',    name:'Kettlebell Swing',        short:'Swing',        tag:'Full body', reps:'15'},
+  {id:'lungeorb', name:'Reverse Lunge + Orbital', short:'RevLunge+Orb', tag:'Full body', reps:'6/side'},
+  {id:'fcarry',   name:"Farmer's Carry",          short:'Carry',        tag:'Full body', reps:'40 m'},
+  {id:'scarry',   name:'Suitcase Carry',          short:'SuitcaseCarry',tag:'Full body', reps:'40 m/side'},
+  {id:'row',      name:'Single-Arm Row',          short:'Row',          tag:'Upper',     reps:'8/side'},
+  {id:'cpress',   name:'Clean & Press',           short:'Clean&Press',  tag:'Upper',     reps:'5/side'},
+  {id:'spress',   name:'Strict Press',            short:'StrictPress',  tag:'Upper',     reps:'5/side'},
+  {id:'pushup',   name:'Push-Ups',                short:'Push-Ups',     tag:'Upper',     reps:'10'},
+  {id:'halo',     name:'Halo',                    short:'Halo',         tag:'Upper',     reps:'5/side'},
+  {id:'dl',       name:'Deadlift',                short:'Deadlift',     tag:'Lower',     reps:'10'},
+  {id:'goblet',   name:'Goblet Squat',            short:'GobletSquat',  tag:'Lower',     reps:'10'},
+  {id:'csquat',   name:'Clean & Squat',           short:'Clean&Squat',  tag:'Lower',     reps:'5/side'},
+];
+const TAG_ORDER = ['Full body','Upper','Lower'];
+const PRESETS = {
+  upper:{label:'Upper (Tue)', ids:['swing','lungeorb','row','cpress','pushup','fcarry']},
+  lower:{label:'Lower (Thu)', ids:['swing','dl','csquat','row','fcarry']},
+};
+const MAX_MOVES = 6;
+const byId = id => MOVES.find(m => m.id === id);
+
+/* ============================ STORAGE ============================ */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('bw.'+k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('bw.'+k, JSON.stringify(v)); }catch(e){} },
+};
+
+/* ============================ STATE ============================ */
+const S = {
+  bell: store.get('bell', 35),          // number (lb)
+  bellKind: store.get('bellKind', '35'),// '35' | '44' | 'other'
+  restTarget: store.get('rest', 90),    // seconds
+  mute: store.get('mute', false),
+  setup: { durMin: 30, sel: [] },       // sel: [{id, reps}]
+  wk: null,                             // live workout, see startWorkout()
+};
+
+/* ============================ DOM ============================ */
+const $ = id => document.getElementById(id);
+const app = $('app');
+const screens = document.querySelectorAll('section[data-s]');
+
+function show(name){
+  screens.forEach(s => { s.hidden = s.dataset.s !== name; });
+  app.dataset.screen = name;
+  window.scrollTo(0, 0);
+}
+
+/* ============================ AUDIO (iOS: no vibration API - sound + color carry the alerts) */
+let actx = null;
+function audioInit(){
+  if (S.mute) return;
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  }catch(e){}
+}
+function tone(freq, at, dur, vol){
+  if (S.mute || !actx) return;
+  try{
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, actx.currentTime + at);
+    g.gain.exponentialRampToValueAtTime(vol, actx.currentTime + at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + at + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(actx.currentTime + at); o.stop(actx.currentTime + at + dur + 0.05);
+  }catch(e){}
+}
+const sfx = {
+  start(){ tone(523, 0, .1, .18); tone(784, .12, .14, .18); },
+  restOver(){ tone(392, 0, .09, .2); tone(392, .16, .09, .2); },
+  timeUp(){ tone(659, 0, .12, .22); tone(659, .18, .12, .22); tone(880, .36, .3, .22); },
+  done(){ tone(660, 0, .08, .15); },
+};
+
+/* ============================ WAKE LOCK ============================ */
+let wakeLock = null;
+async function lockScreen(){
+  try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function unlockScreen(){ try{ wakeLock && wakeLock.release(); }catch(e){} wakeLock = null; }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.wk && !S.wk.finished) lockScreen();
+});
+
+/* ============================ FORMATTING ============================ */
+function fmt(ms){
+  const t = Math.max(0, Math.round(ms / 1000));
+  return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+function fmtReps(r){
+  const t = r.replace(/~/g, '').replace(/\/side/g, '/s').replace(/\s+/g, '').trim();
+  return /\dm/.test(t) ? t : '\u00D7' + t; // "40m" reads as distance, no multiply sign
+}
+
+/* ============================ HOME ============================ */
+function renderHome(){
+  document.querySelectorAll('[data-bell-pick]').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.bellPick === S.bellKind));
+  });
+  $('otherWeight').hidden = S.bellKind !== 'other';
+  app.dataset.bell = S.bellKind;
+  $('restVal').textContent = fmt(S.restTarget * 1000);
+  $('muteBtn').textContent = S.mute ? 'Sound off' : 'Sound on';
+  $('muteBtn').setAttribute('aria-pressed', String(S.mute));
+  $('qUpperDesc').textContent = PRESETS.upper.ids.map(id => byId(id).short).join(' \u00B7 ');
+  $('qLowerDesc').textContent = PRESETS.lower.ids.map(id => byId(id).short).join(' \u00B7 ');
+}
+document.querySelectorAll('[data-bell-pick]').forEach(b => b.addEventListener('click', () => {
+  S.bellKind = b.dataset.bellPick;
+  if (S.bellKind === '35') S.bell = 35;
+  else if (S.bellKind === '44') S.bell = 44;
+  else S.bell = parseInt($('otherLb').value, 10) || 53;
+  store.set('bellKind', S.bellKind); store.set('bell', S.bell);
+  renderHome();
+}));
+$('otherLb').addEventListener('change', () => {
+  S.bell = Math.min(200, Math.max(5, parseInt($('otherLb').value, 10) || 53));
+  $('otherLb').value = S.bell;
+  store.set('bell', S.bell);
+});
+$('restMinus').addEventListener('click', () => { S.restTarget = Math.max(15, S.restTarget - 15); store.set('rest', S.restTarget); renderHome(); });
+$('restPlus').addEventListener('click', () => { S.restTarget = Math.min(300, S.restTarget + 15); store.set('rest', S.restTarget); renderHome(); });
+$('muteBtn').addEventListener('click', () => { S.mute = !S.mute; store.set('mute', S.mute); renderHome(); });
+
+$('qUpper').addEventListener('click', () => prepareWorkout(PRESETS.upper.label, PRESETS.upper.ids.map(id => ({id, reps: byId(id).reps})), 30, 'home'));
+$('qLower').addEventListener('click', () => prepareWorkout(PRESETS.lower.label, PRESETS.lower.ids.map(id => ({id, reps: byId(id).reps})), 30, 'home'));
+$('qCustom').addEventListener('click', () => { renderSetup(); show('setup'); });
+
+/* ============================ CUSTOM SETUP ============================ */
+function renderSetup(){
+  $('setupBell').textContent = S.bell + ' lb';
+  $('durVal').textContent = fmt(S.setup.durMin * 60000);
+  const n = S.setup.sel.length;
+  $('selCount').textContent = n + ' / ' + MAX_MOVES;
+  $('selCount').classList.toggle('max', n >= MAX_MOVES);
+  $('startCustom').disabled = n === 0;
+  $('startCustom').textContent = n === 0 ? 'Pick movements' : 'Review \u00B7 ' + fmt(S.setup.durMin * 60000);
+
+  const list = $('moveList');
+  list.innerHTML = '';
+  TAG_ORDER.forEach(tag => {
+    const h = document.createElement('div');
+    h.className = 'slabel'; h.style.margin = '14px 0 8px';
+    h.textContent = tag;
+    list.appendChild(h);
+    MOVES.filter(m => m.tag === tag).forEach(m => {
+      const sel = S.setup.sel.find(s => s.id === m.id);
+      const btn = document.createElement('button');
+      btn.className = 'move';
+      btn.setAttribute('aria-pressed', String(!!sel));
+      btn.disabled = !sel && n >= MAX_MOVES;
+      btn.innerHTML = '<span class="box">' + (sel ? '\u2713' : '') + '</span>' +
+                      '<span class="nm">' + m.name + '</span>' +
+                      '<span class="rep">' + (sel ? sel.reps : m.reps) + '</span>';
+      btn.addEventListener('click', () => {
+        if (sel) S.setup.sel = S.setup.sel.filter(s => s.id !== m.id);
+        else S.setup.sel.push({id: m.id, reps: m.reps});
+        renderSetup();
+      });
+      list.appendChild(btn);
+      if (sel){
+        const ed = document.createElement('div');
+        ed.className = 'repedit';
+        ed.innerHTML = '<label for="rep-' + m.id + '">reps</label>' +
+                       '<input id="rep-' + m.id + '" type="text" value="' + sel.reps.replace(/"/g, '&quot;') + '">';
+        ed.querySelector('input').addEventListener('change', e => {
+          sel.reps = e.target.value.trim() || m.reps;
+          renderSetup();
+        });
+        list.appendChild(ed);
+      }
+    });
+  });
+}
+$('setupBack').addEventListener('click', () => { renderHome(); show('home'); });
+$('durMinus').addEventListener('click', () => { S.setup.durMin = Math.max(5, S.setup.durMin - 5); renderSetup(); });
+$('durPlus').addEventListener('click', () => { S.setup.durMin = Math.min(90, S.setup.durMin + 5); renderSetup(); });
+$('fillUpper').addEventListener('click', () => { S.setup.sel = PRESETS.upper.ids.map(id => ({id, reps: byId(id).reps})); renderSetup(); });
+$('fillLower').addEventListener('click', () => { S.setup.sel = PRESETS.lower.ids.map(id => ({id, reps: byId(id).reps})); renderSetup(); });
+$('clearSel').addEventListener('click', () => { S.setup.sel = []; renderSetup(); });
+$('startCustom').addEventListener('click', () => {
+  if (!S.setup.sel.length) return;
+  prepareWorkout('Custom', S.setup.sel.map(s => ({...s})), S.setup.durMin, 'setup');
+});
+
+/* ============================ READY (the deliberate start step) ============================ */
+let pending = null;
+function renderReadyCircuit(){
+  const c = $('readyCircuit');
+  c.innerHTML = '';
+  pending.sel.forEach(s => {
+    const m = byId(s.id);
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = '<span class="grip" aria-hidden="true"></span><span class="nm">' + m.name + '</span><span class="rep">' + s.reps + '</span>';
+    c.appendChild(r);
+  });
+}
+function prepareWorkout(label, sel, durMin, from){
+  pending = {label, sel, durMin, from};
+  $('readyBell').textContent = S.bell + ' lb';
+  $('readyTitle').textContent = label;
+  $('readySub').textContent = fmt(durMin * 60000) + ' \u00B7 rest alert ' + fmt(S.restTarget * 1000);
+  renderReadyCircuit();
+  show('ready');
+}
+$('readyBack').addEventListener('click', () => {
+  if (pending && pending.from === 'setup'){ renderSetup(); show('setup'); }
+  else { renderHome(); show('home'); }
+});
+$('readyStart').addEventListener('click', () => {
+  if (pending) startWorkout(pending.label, pending.sel, pending.durMin);
+});
+
+// Drag a grip to reorder the circuit. Inline transforms here are drag
+// mechanics, not styling - the look stays in the CSS tokens.
+function makeSortable(container, onReorder){
+  let drag = null;
+  container.addEventListener('pointerdown', e => {
+    const grip = e.target.closest ? e.target.closest('.grip') : null;
+    if (!grip) return;
+    const row = grip.parentElement;
+    const rows = Array.prototype.slice.call(container.children);
+    const idx = rows.indexOf(row);
+    drag = {row, rows, startY: e.clientY, startIdx: idx, curIdx: idx, rowH: row.offsetHeight || 1};
+    row.classList.add('dragging');
+    try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  });
+  function onMove(e){
+    if (!drag) return;
+    const dy = e.clientY - drag.startY;
+    drag.row.style.transform = 'translateY(' + dy + 'px)';
+    let t = drag.startIdx + Math.round(dy / drag.rowH);
+    t = Math.max(0, Math.min(drag.rows.length - 1, t));
+    if (t === drag.curIdx) return;
+    drag.curIdx = t;
+    drag.rows.forEach((r, i) => {
+      if (r === drag.row) return;
+      let shift = 0;
+      if (drag.startIdx < t && i > drag.startIdx && i <= t) shift = -drag.rowH;
+      else if (drag.startIdx > t && i >= t && i < drag.startIdx) shift = drag.rowH;
+      r.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+    });
+  }
+  function onUp(){
+    if (!drag) return;
+    const from = drag.startIdx, to = drag.curIdx;
+    drag.row.classList.remove('dragging');
+    drag.row.style.transform = '';
+    drag = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    if (from !== to) onReorder(from, to);
+  }
+}
+makeSortable($('readyCircuit'), (from, to) => {
+  if (!pending) return;
+  const moved = pending.sel.splice(from, 1)[0];
+  pending.sel.splice(to, 0, moved);
+  renderReadyCircuit();
+});
+
+/* ============================ WORKOUT ENGINE ============================ */
+// Timestamp-based: every display value derives from Date.now() so the clock
+// stays truthful even if the browser throttles timers.
+let ticker = null;
+
+function startWorkout(label, sel, durMin){
+  audioInit();
+  S.wk = {
+    label,
+    bell: S.bell,
+    moves: sel.map(s => ({...byId(s.id), reps: s.reps})),
+    durMs: durMin * 60000,
+    startTs: Date.now(),
+    rounds: [],                 // completed: [{start, end}]
+    roundStart: Date.now(),     // current round start (work mode)
+    restStart: null,            // current rest start (rest mode)
+    mode: 'work',
+    timeUpFired: false,
+    restAlerted: false,
+    endConfirm: 0,
+    finished: false,
+    endedMidRound: false,
+  };
+  $('activeBell').textContent = S.bell + ' lb';
+  const c = $('circuitList');
+  c.innerHTML = '';
+  S.wk.moves.forEach(m => {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = '<span>' + m.name + '</span><span class="rep">' + m.reps + '</span>';
+    c.appendChild(r);
+  });
+  app.classList.remove('overtime', 'rest-over');
+  $('timeBanner').hidden = true;
+  lockScreen();
+  sfx.start();
+  show('active');
+  renderActive();
+  clearInterval(ticker);
+  ticker = setInterval(renderActive, 200);
+}
+
+function renderActive(){
+  const wk = S.wk;
+  if (!wk || wk.finished) return;
+  const now = Date.now();
+  const remaining = wk.durMs - (now - wk.startTs);
+  const overtime = remaining <= 0;
+
+  // one-time time's-up moment
+  if (overtime && !wk.timeUpFired){
+    wk.timeUpFired = true;
+    sfx.timeUp();
+    if (wk.mode === 'rest'){ finishWorkout(false); return; } // resting at the bell = done
+    $('timeBanner').hidden = false;
+    app.classList.add('overtime');
+    $('roundBtn').classList.add('action--hot');
+    $('roundBtn').textContent = 'Done \u2014 finish';
+  }
+
+  $('roundLabel').textContent = 'Round ' + (wk.rounds.length + 1);
+
+  if (wk.mode === 'work'){
+    $('modeLabel').textContent = overtime ? 'Overtime' : 'Work';
+    $('bigClock').textContent = overtime ? '+' + fmt(now - wk.startTs - wk.durMs) : fmt(remaining);
+    $('subClock').hidden = true;
+  } else {
+    const rest = now - wk.restStart;
+    $('modeLabel').textContent = 'Rest';
+    $('bigClock').textContent = fmt(rest);
+    $('subClock').hidden = false;
+    $('subClock').textContent = fmt(remaining) + ' left \u00B7 alert at ' + fmt(S.restTarget * 1000);
+    if (rest >= S.restTarget * 1000 && !wk.restAlerted){
+      wk.restAlerted = true;
+      app.classList.add('rest-over');
+      sfx.restOver();
+    }
+  }
+
+  // reset end-confirm after 3s
+  if (wk.endConfirm && now - wk.endConfirm > 3000){
+    wk.endConfirm = 0;
+    $('endBtn').textContent = 'End';
+  }
+}
+
+$('roundBtn').addEventListener('click', () => {
+  const wk = S.wk;
+  if (!wk || wk.finished) return;
+  audioInit();
+  const now = Date.now();
+  if (wk.mode === 'work'){
+    wk.rounds.push({start: wk.roundStart, end: now});
+    if (wk.timeUpFired){ finishWorkout(false); return; } // finish-the-round rule
+    wk.mode = 'rest';
+    wk.restStart = now;
+    wk.restAlerted = false;
+    app.dataset.mode = 'rest';
+    app.classList.remove('rest-over');
+    $('roundBtn').classList.add('action--rest');
+    $('roundBtn').textContent = 'Start round ' + (wk.rounds.length + 1);
+    sfx.done();
+  } else {
+    wk.mode = 'work';
+    wk.roundStart = now;
+    wk.restStart = null;
+    app.dataset.mode = 'work';
+    app.classList.remove('rest-over');
+    $('roundBtn').classList.remove('action--rest');
+    $('roundBtn').textContent = 'Done round';
+    sfx.start();
+  }
+  renderActive();
+});
+
+$('endBtn').addEventListener('click', () => {
+  const wk = S.wk;
+  if (!wk || wk.finished) return;
+  if (!wk.endConfirm){
+    wk.endConfirm = Date.now();
+    $('endBtn').textContent = 'Sure?';
+    return;
+  }
+  // ending mid-work with meaningful effort logs a partial round
+  if (wk.mode === 'work' && Date.now() - wk.roundStart > 20000) wk.endedMidRound = true;
+  finishWorkout(true);
+});
+
+/* ============================ SUMMARY ============================ */
+function finishWorkout(manual){
+  const wk = S.wk;
+  wk.finished = true;
+  clearInterval(ticker);
+  unlockScreen();
+  app.dataset.mode = 'work';
+  app.classList.remove('overtime', 'rest-over');
+  $('roundBtn').classList.remove('action--rest', 'action--hot');
+  $('roundBtn').textContent = 'Done round';
+  $('endBtn').textContent = 'End';
+  $('timeBanner').hidden = true;
+
+  const endTs = wk.rounds.length ? wk.rounds[wk.rounds.length - 1].end : Date.now();
+  const actual = (manual && !wk.rounds.length ? Date.now() : endTs) - wk.startTs;
+
+  $('sumRounds').textContent = wk.rounds.length + (wk.endedMidRound ? '+' : '');
+  $('sumTime').textContent = fmt(actual);
+  $('sumBell').innerHTML = wk.bell + '<small> lb</small>';
+
+  // splits
+  const rows = [];
+  const splitEl = $('splitList');
+  splitEl.innerHTML = '';
+  wk.rounds.forEach((r, i) => {
+    const work = r.end - r.start;
+    const next = wk.rounds[i + 1];
+    const rest = next ? next.start - r.end : null;
+    rows.push('R' + (i + 1) + ' ' + fmt(work) + (rest != null ? ' (rest ' + fmt(rest) + ')' : ''));
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = '<span class="rn">R' + (i + 1) + '</span><span class="wt">' + fmt(work) + ' work</span>' +
+                    (rest != null ? '<span class="rt">' + fmt(rest) + ' rest</span>' : '<span class="rt">\u2014</span>');
+    splitEl.appendChild(div);
+  });
+  if (!wk.rounds.length){
+    splitEl.innerHTML = '<div class="row"><span class="wt">No completed rounds</span></div>';
+  }
+
+  const circuit = wk.moves.map(m => m.short + ' ' + fmtReps(m.reps)).join(' \u00B7 ');
+  const text =
+    'KB Session \u2014 ' + wk.label + '\n' +
+    'Bell: ' + wk.bell + ' lb \u00B7 Planned ' + fmt(wk.durMs) + ' \u00B7 Actual ' + fmt(actual) + '\n' +
+    'Rounds: ' + wk.rounds.length + (wk.endedMidRound ? ' + partial' : '') + '\n' +
+    'Circuit: ' + circuit + '\n' +
+    (rows.length ? 'Splits: ' + rows.join(' \u00B7 ') : 'Splits: \u2014');
+  $('pasteBlock').textContent = text;
+  wk.summaryText = text;
+
+  document.querySelector('[data-s="summary"]').classList.remove('copied');
+  $('copyBtn').textContent = 'Copy summary';
+  show('summary');
+}
+
+$('copyBtn').addEventListener('click', async () => {
+  const text = S.wk ? S.wk.summaryText : '';
+  let ok = false;
+  try{ await navigator.clipboard.writeText(text); ok = true; }
+  catch(e){
+    // fallback: select the block so a long-press copy works
+    const range = document.createRange();
+    range.selectNodeContents($('pasteBlock'));
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    try{ ok = document.execCommand('copy'); }catch(e2){}
+  }
+  if (ok){
+    document.querySelector('[data-s="summary"]').classList.add('copied');
+    $('copyBtn').textContent = 'Copied \u2713';
+  }
+});
+
+$('newWorkout').addEventListener('click', e => {
+  e.preventDefault();
+  S.wk = null;
+  renderHome();
+  show('home');
+});
+
+/* ============================ BOOT ============================ */
+if (S.bellKind === 'other') $('otherLb').value = S.bell;
+renderHome();
+</script>
