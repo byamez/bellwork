@@ -524,19 +524,34 @@ input{font:inherit;color:inherit}
 // Reps are text on purpose ("8/side", "40 m") - edited freely during setup.
 const MOVES = [
   {id:'swing',    name:'Kettlebell Swing',        short:'Swing',        tag:'Full body', reps:'15'},
+  {id:'swing1',   name:'Single-Arm Swing',        short:'1ArmSwing',    tag:'Full body', reps:'12/side'},
+  {id:'snatch',   name:'Snatch',                  short:'Snatch',       tag:'Full body', reps:'8/side'},
+  {id:'highpull', name:'High Pull',               short:'HighPull',     tag:'Full body', reps:'10/side'},
+  {id:'clean',    name:'Clean',                   short:'Clean',        tag:'Full body', reps:'8/side'},
+  {id:'thruster', name:'Thruster',                short:'Thruster',     tag:'Full body', reps:'5/side'},
+  {id:'tgu',      name:'Turkish Get-Up',          short:'TGU',          tag:'Full body', reps:'2/side'},
   {id:'lungeorb', name:'Reverse Lunge + Orbital', short:'RevLunge+Orb', tag:'Full body', reps:'6/side'},
   {id:'fcarry',   name:"Farmer's Carry",          short:'Carry',        tag:'Full body', reps:'40 m'},
   {id:'scarry',   name:'Suitcase Carry',          short:'SuitcaseCarry',tag:'Full body', reps:'40 m/side'},
   {id:'row',      name:'Single-Arm Row',          short:'Row',          tag:'Upper',     reps:'8/side'},
+  {id:'rrow',     name:'Renegade Row',            short:'RenRow',       tag:'Upper',     reps:'6/side'},
   {id:'cpress',   name:'Clean & Press',           short:'Clean&Press',  tag:'Upper',     reps:'5/side'},
+  {id:'ppress',   name:'Push Press',              short:'PushPress',    tag:'Upper',     reps:'6/side'},
   {id:'spress',   name:'Strict Press',            short:'StrictPress',  tag:'Upper',     reps:'5/side'},
+  {id:'seated',   name:'Seated Press',            short:'SeatedPress',  tag:'Upper',     reps:'5/side'},
   {id:'pushup',   name:'Push-Ups',                short:'Push-Ups',     tag:'Upper',     reps:'10'},
   {id:'halo',     name:'Halo',                    short:'Halo',         tag:'Upper',     reps:'5/side'},
+  {id:'curl',     name:'Single-Arm Curl',         short:'Curl',         tag:'Upper',     reps:'10/side'},
+  {id:'curl2h',   name:'Two-Hand Curl',           short:'2HandCurl',    tag:'Upper',     reps:'12'},
   {id:'dl',       name:'Deadlift',                short:'Deadlift',     tag:'Lower',     reps:'10'},
   {id:'goblet',   name:'Goblet Squat',            short:'GobletSquat',  tag:'Lower',     reps:'10'},
+  {id:'fsquat',   name:'Front Squat',             short:'FrontSquat',   tag:'Lower',     reps:'10'},
   {id:'csquat',   name:'Clean & Squat',           short:'Clean&Squat',  tag:'Lower',     reps:'5/side'},
+  {id:'revlunge', name:'Reverse Lunge',           short:'RevLunge',     tag:'Lower',     reps:'8/side'},
+  {id:'windmill', name:'Windmill',                short:'Windmill',     tag:'Core',      reps:'5/side'},
+  {id:'rtwist',   name:'Russian Twist',           short:'RussTwist',    tag:'Core',      reps:'10/side'},
 ];
-const TAG_ORDER = ['Full body','Upper','Lower'];
+const TAG_ORDER = ['Full body','Upper','Lower','Core'];
 const PRESETS = {
   upper:{label:'Upper (Tue)', ids:['swing','lungeorb','row','cpress','pushup','fcarry']},
   lower:{label:'Lower (Thu)', ids:['swing','dl','csquat','row','fcarry']},
